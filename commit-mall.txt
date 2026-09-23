@@ -1,0 +1,12 @@
+
+# Ämnesrad: vad som blev klart. Högst 60 tecken. Ingen punkt på slutet.
+# Exempel:  Del 2: labbmiljön som kod med Terraform
+#
+# Tom rad, sedan VARFÖR, 2 till 6 rader. Vad som ändrades syns i diffen.
+# Avsluta med vad som verifierades och hur.
+#
+# Svenska med å, ä, ö. Inga tankstreck.
+# Inte: fix, wip, uppdatering, ändringar, test, rättelse.
+# Är det en rättelse av förra committen: granska om, committa inte.
+#
+# Rader som börjar med # tas bort av git.

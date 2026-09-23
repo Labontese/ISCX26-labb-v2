@@ -1,0 +1,17 @@
+# Radslut normaliseras till LF i repot, oavsett vilken maskin som committar.
+# Utan detta blir det CRLF från Windows och LF från Linux, och git visar då
+# hela filen som ändrad fast bara en rad rörts.
+* text=auto eol=lf
+
+# Diagrammens källfiler är XML respektive JSON, alltså text. Att säga det
+# uttryckligen gör att git visar riktiga diffar i stället för
+# "binary files differ" när ett diagram ändras.
+*.drawio     text eol=lf
+*.excalidraw text eol=lf
+*.svg        text eol=lf
+
+# Exporterade bilder är binära och ska aldrig radslutsnormaliseras.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.pdf  binary
