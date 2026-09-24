@@ -33,8 +33,12 @@ TEXTFILER=$(git ls-files --cached --others --exclude-standard 2>/dev/null \
 rubrik "Språk"
 
 # ASCII-svenska: vanliga ord som tappat å, ä eller ö. Mappnamn undantas.
+# Filnamn ska vara ASCII, så sökvägar i länkar som (bilder/del3-natverk.png)
+# tas bort innan sökningen. sed tar inte bort rader, så radnumren stämmer.
 MONSTER='\b(natverk|granssnitt|forsta|installning|maste|sokvag|behover|nagot|hander|lamnar|dopper|anvand|sjalv|tva|fran|ocksa|nagon|forklar|andra inte|for hand|pa ett|ar inte)\b'
-TRAFF=$(echo "$TEXTFILER" | grep -v "granska.sh" | xargs grep -nE "$MONSTER" 2>/dev/null | grep -viE 'natverksdokumentation|arbetsmall' || true)
+TRAFF=$(for f in $(echo "$TEXTFILER" | grep -v "granska.sh"); do
+            sed -E 's#\([^) ]+\.(png|jpg|jpeg|svg|drawio)\)##g' "$f" | grep -nE "$MONSTER" | sed "s#^#$f:#"
+        done | grep -viE 'natverksdokumentation|arbetsmall' || true)
 if [ -n "$TRAFF" ]; then
     fel "ASCII-svenska (ord utan å ä ö):"
     echo "$TRAFF" | head -15 | sed 's/^/          /'

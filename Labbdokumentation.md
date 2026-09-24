@@ -203,6 +203,61 @@ sätts till privat. Och Windows svarar inte på ping förrän regeln
 `FPS-ICMP4-ERQ-In` är påslagen. Utan dem ser det ut som att nätet är trasigt,
 fast adresserna är rätt.
 
+**Fjärråtkomst med SSH**
+
+Jag vill arbeta i båda maskinerna från samma terminal i VS Code. Linuxservern
+har SSH från början, med min nyckel inlagd av cloud-init. OpenSSH-servern
+följer med Windows Server 2025, men den är avstängd, så den slogs på:
+
+```powershell
+Set-Service sshd -StartupType Automatic
+Start-Service sshd
+Set-Content C:\ProgramData\ssh\administrators_authorized_keys '<min publika nyckel>' -Encoding ascii
+icacls C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r /grant '*S-1-5-32-544:F' /grant '*S-1-5-18:F'
+New-ItemProperty HKLM:\SOFTWARE\OpenSSH -Name DefaultShell -PropertyType String -Force `
+    -Value 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+Set-NetFirewallRule -Name OpenSSH-Server-In-TCP -InterfaceAlias Drift
+```
+
+I `C:\ProgramData\ssh\sshd_config` lade jag till två rader, före blocket
+`Match Group administrators`. Står de efter gäller de bara inuti blocket.
+Filen kontrollerades med `sshd -t` innan tjänsten startades om.
+
+```
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+```
+
+Det här gör raderna:
+
+- Konton som är administratörer läser sin nyckel från en gemensam fil, inte
+  från sin egen profil. Filen får bara vara läsbar för Administrators och
+  SYSTEM, annars vägrar SSH-servern använda den. Det är det `icacls` ser till.
+- Skalet blir PowerShell i stället för cmd.
+- Brandväggen släpper bara in SSH via driftkortet. Från labbnätet går det inte
+  att nå port 22.
+- Inloggning med lösenord är avstängd. Bara den som har nyckeln kommer in.
+
+Kontrollen, från min egen dator:
+
+```
+> ssh -o BatchMode=yes iscx26-win whoami
+iscx26-win\administrator
+
+> ssh -o BatchMode=yes -o PubkeyAuthentication=no iscx26-win exit
+Administrator@10.10.70.113: Permission denied (publickey).
+
+> ssh -o BatchMode=yes -o PubkeyAuthentication=no iscx26-linux exit
+daniel@10.10.70.112: Permission denied (publickey).
+```
+
+`BatchMode=yes` gör att `ssh` aldrig frågar efter något utan ger upp direkt,
+och `PubkeyAuthentication=no` låtsas att jag saknar nyckel. `(publickey)` är
+då det enda sättet som erbjuds, på båda maskinerna. Första
+gången jag anslöt sparades maskinernas fingeravtryck. Jag jämförde dem med
+fingeravtrycken avlästa inifrån maskinerna, och de stämde. Då vet jag att det
+är rätt maskin som svarar.
+
 ### 2.5 Verifiering
 
 **Linuxservern, avläst inifrån maskinen**
@@ -328,14 +383,198 @@ risktabell måste läsas vid det steg den gäller, inte bara skrivas i början.
 
 ## 3. Genomförande
 
-> (mall) Ett underavsnitt per moment i uppgiften. Samma form varje gång:
-> (mall) kommando, ordagrann utskrift, en mening om vad utskriften bevisar.
-> (mall) Räcker inte listningen som bevis, testa skarpt (till exempel som en
-> (mall) användare utan rättighet) och visa nekandet.
+Alla kommandon i det här avsnittet skrev jag själv i en terminal i VS Code,
+inloggad med SSH på respektive maskin. Varje steg har kommandot, utskriften
+ordagrant och en skärmdump av samma terminal.
 
-### 3.1
+### 3.1 Linux
 
-### 3.2
+Jag är inloggad som den vanliga användaren `daniel`. Kontot är inte root, men
+får köra kommandon som root med `sudo`. Det spelar roll längre ner.
+
+**Mappen och filen**
+
+```
+$ sudo mkdir -p /var/systementor/konsultdata
+$ sudo touch /var/systementor/konsultdata/anteckningar.txt
+$ ls -la /var/systementor/konsultdata
+total 8
+drwxr-xr-x 2 root root 4096 Sep 24 08:39 .
+drwxr-xr-x 3 root root 4096 Sep 24 08:39 ..
+-rw-r--r-- 1 root root    0 Sep 24 08:39 anteckningar.txt
+```
+
+![Mappen och filen innan rättigheterna ändrats](bilder/del3-linux-1-fore.png)
+
+`-p` behövs eftersom `/var/systementor` inte fanns, så båda nivåerna skapas på
+en gång. `sudo` behövs eftersom `/var` ägs av root. Mappen fick 755 och filen
+644 utan att jag bad om det. Det styrs av inställningen `umask`, som på den
+här maskinen är 0022. Just nu kan alla användare på maskinen läsa filen.
+
+**Gruppen konsulter**
+
+```
+$ sudo groupadd konsulter
+$ getent group konsulter
+konsulter:x:1001:
+$ sudo chgrp konsulter /var/systementor/konsultdata
+$ sudo chgrp konsulter /var/systementor/konsultdata/anteckningar.txt
+$ ls -la /var/systementor/konsultdata
+total 8
+drwxr-xr-x 2 root konsulter 4096 Sep 24 08:39 .
+drwxr-xr-x 3 root root      4096 Sep 24 08:39 ..
+-rw-r--r-- 1 root konsulter    0 Sep 24 08:39 anteckningar.txt
+```
+
+![Gruppen skapad och satt som gruppägare](bilder/del3-linux-2-grupp.png)
+
+Gruppen fick id 1001. Efter sista kolonet står ingenting. Där listas gruppens
+medlemmar, så gruppen är tom. `chgrp` byter bara gruppägare: ägaren är
+fortfarande root och rättigheterna är desamma som förut.
+
+**Rättigheterna 750 och 640**
+
+Varje siffra är summan av läsa (4), skriva (2) och köra (1). För en mapp
+betyder "köra" att man får gå in i den. Siffrorna gäller i tur och ordning
+ägaren, gruppen och övriga.
+
+| | Ägare (root) | Grupp (konsulter) | Övriga |
+|---|---|---|---|
+| Mappen, 750 | 7: läsa, skriva, gå in | 5: läsa, gå in | 0: ingenting |
+| Filen, 640 | 6: läsa, skriva | 4: läsa | 0: ingenting |
+
+```
+$ sudo chmod 750 /var/systementor/konsultdata
+$ sudo chmod 640 /var/systementor/konsultdata/anteckningar.txt
+$ ls -la /var/systementor/konsultdata
+ls: cannot open directory '/var/systementor/konsultdata': Permission denied
+$ namei -l /var/systementor/konsultdata/anteckningar.txt
+f: /var/systementor/konsultdata/anteckningar.txt
+drwxr-xr-x root root      /
+drwxr-xr-x root root      var
+drwxr-xr-x root root      systementor
+drwxr-x--- root konsulter konsultdata
+                           anteckningar.txt - Permission denied
+```
+
+![ls och namei nekas utan sudo](bilder/del3-linux-3-neka.png)
+
+Här missade jag `sudo` på de två sista raderna. Det blev ändå ett bevis. Jag är
+varken root eller med i `konsulter`, så jag räknas som övriga, och övriga har
+0 på mappen. `namei -l` visar rättigheterna för varje mapp på vägen ner till
+filen och visar precis var det tar stopp: `/`, `var` och `systementor` går
+att passera, `konsultdata` gör det inte.
+
+Samma kommandon med `sudo`:
+
+```
+$ sudo ls -la /var/systementor/konsultdata
+total 8
+drwxr-x--- 2 root konsulter 4096 Sep 24 08:39 .
+drwxr-xr-x 3 root root      4096 Sep 24 08:39 ..
+-rw-r----- 1 root konsulter    0 Sep 24 08:39 anteckningar.txt
+$ sudo namei -l /var/systementor/konsultdata/anteckningar.txt
+f: /var/systementor/konsultdata/anteckningar.txt
+drwxr-xr-x root root      /
+drwxr-xr-x root root      var
+drwxr-xr-x root root      systementor
+drwxr-x--- root konsulter konsultdata
+-rw-r----- root konsulter anteckningar.txt
+```
+
+![ls och namei med sudo, 750 och 640](bilder/del3-linux-3-chmod.png)
+
+`drwxr-x---` är 750 och `-rw-r-----` är 640, precis som uppgiften kräver.
+
+**Skarpt test**
+
+Listan visar vad som borde gälla. För att se att det faktiskt gäller skrev jag
+en rad i filen, skapade en testanvändare som är med i gruppen och provade tre
+saker.
+
+```
+$ echo "Första anteckningen" | sudo tee /var/systementor/konsultdata/anteckningar.txt
+Första anteckningen
+$ sudo useradd -M -s /usr/sbin/nologin -G konsulter konsult1
+$ sudo useradd -M -s /usr/sbin/nologin -G konsulter konsult1
+id konsult1
+useradd: user 'konsult1' already exists
+uid=1001(konsult1) gid=1002(konsult1) groups=1002(konsult1),1001(konsulter)
+$ sudo -u konsult1 cat /var/systementor/konsultdata/anteckningar.txt
+Första anteckningen
+$ sudo -u konsult1 bash -c 'echo test >> /var/systementor/konsultdata/anteckningar.txt'
+bash: line 1: /var/systementor/konsultdata/anteckningar.txt: Permission denied
+$ sudo -u nobody cat /var/systementor/konsultdata/anteckningar.txt
+cat: /var/systementor/konsultdata/anteckningar.txt: Permission denied
+```
+
+![Skarpt test med konsult1 och nobody](bilder/del3-linux-4-test.png)
+
+`useradd -M -s /usr/sbin/nologin` skapar en användare utan hemmapp som inte
+kan logga in. Den finns bara för testet. `useradd` står två gånger eftersom
+jag råkade klistra in raden en gång till. Andra gången svarade den att
+användaren redan fanns, och ingenting ändrades.
+
+Skrivtestet körs med `bash -c`. Utan det skulle mitt eget skal, som `daniel`,
+öppna filen för `>>` innan `sudo` ens startat, och då testas fel användare.
+
+| Test | Användare | Resultat | Varför |
+|---|---|---|---|
+| Läsa | konsult1 | fungerar | gruppen har 4, läsa |
+| Skriva | konsult1 | `Permission denied` | gruppen saknar 2, skriva |
+| Läsa | nobody | `Permission denied` | inte med i gruppen, övriga har 0 |
+
+**Nätverket**
+
+```
+$ ping -c 4 192.168.110.51
+PING 192.168.110.51 (192.168.110.51) 56(84) bytes of data.
+64 bytes from 192.168.110.51: icmp_seq=1 ttl=128 time=3.24 ms
+64 bytes from 192.168.110.51: icmp_seq=2 ttl=128 time=1.33 ms
+64 bytes from 192.168.110.51: icmp_seq=3 ttl=128 time=1.26 ms
+64 bytes from 192.168.110.51: icmp_seq=4 ttl=128 time=1.25 ms
+
+--- 192.168.110.51 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3004ms
+rtt min/avg/max/mdev = 1.249/1.769/3.238/0.848 ms
+$ ip addr show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host noprefixroute
+       valid_lft forever preferred_lft forever
+2: ens18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether bc:24:11:00:c3:11 brd ff:ff:ff:ff:ff:ff
+    altname enp6s18
+    altname enxbc241100c311
+    inet 192.168.110.50/24 brd 192.168.110.255 scope global ens18
+       valid_lft forever preferred_lft forever
+    inet6 fe80::be24:11ff:fe00:c311/64 scope link proto kernel_ll
+       valid_lft forever preferred_lft forever
+3: ens19: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether bc:24:11:00:d3:11 brd ff:ff:ff:ff:ff:ff
+    altname enp6s19
+    altname enxbc241100d311
+    inet 10.10.70.112/24 metric 100 brd 10.10.70.255 scope global dynamic ens19
+       valid_lft 5614sec preferred_lft 5614sec
+    inet6 fe80::be24:11ff:fe00:d311/64 scope link proto kernel_ll
+       valid_lft forever preferred_lft forever
+```
+
+![ping till Windows och ip addr show](bilder/del3-linux-5-natverk.png)
+
+Alla fyra paketen kom fram, och `ttl=128` visar att det är Windows som svarar.
+I `ip addr show` finns labbnätets adress `192.168.110.50/24` på `ens18`, med
+MAC-adressen `bc:24:11:00:c3:11` som jag satte i Terraform. Två ord skiljer de
+två korten åt. `ens18` har `valid_lft forever`, adressen är statisk och gäller
+tills någon ändrar den. `ens19` har `dynamic` och `valid_lft 5614sec`, adressen
+är lånad från DHCP-servern och måste förnyas.
+
+### 3.2 Windows
+
+> (mall) Mapp, `Get-Acl`, ping eller `Test-Connection`, `ipconfig /all`. Samma
+> (mall) form som 3.1.
 
 ---
 
