@@ -1,11 +1,9 @@
 # Labbdokumentation: virtuell labbmiljö och nätverk
 
-**Daniel Gustafsson**
-Chas Academy, ISCX26
-September 2026
-
-> (mall) Rader som börjar med `> (mall)` är instruktioner till mig själv. De tas bort
-> (mall) när avsnittet är klart. Ett avsnitt är inte klart så länge en sådan rad finns kvar.
+**Daniel Gustafsson**\
+Chas Academy, ISCX26\
+Kurs: Introduktion till yrkesrollen och grunderna i IT-infrastruktur\
+24 september 2026
 
 ---
 
@@ -39,7 +37,7 @@ det inte finns någon färdig mall.
 |---|---|---|
 | VM-id | 311 | 312 |
 | Hostname | `iscx26-linux` | `iscx26-win` |
-| OS | Ubuntu Server 26.04 | Windows Server 2025 |
+| OS | Ubuntu Server 26.04 LTS | Windows Server 2025 |
 | Labbnät | 192.168.110.50/24 | 192.168.110.51/24 |
 | Driftnät | DHCP på VLAN 70 | DHCP på VLAN 70 |
 
@@ -81,8 +79,8 @@ Ingen `terraform apply` körs utan att planen först är läst rad för rad.
 | `iscx26-linux` | Ubuntu Server 26.04 LTS | 192.168.110.50 | 255.255.255.0 | ingen |
 | `iscx26-win` | Windows Server 2025 | 192.168.110.51 | 255.255.255.0 | ingen |
 
-Tabellen gäller labbnätet, som är det uppgiften handlar om. Varje värde är
-hämtat ur en utskrift längre ner i avsnittet.
+Tabellen gäller labbnätet, som är det uppgiften handlar om. Namn, adresser
+och masker är hämtade ur utskrifter längre ner i avsnittet.
 
 Kolumnen för gateway står tom med flit. En gateway är den router som trafiken
 skickas till när målet ligger i ett annat nät. Labbnätet har ingen router och
@@ -145,7 +143,7 @@ ipv4 på bryggan: 0
 ```
 
 Bryggan skapas med Open vSwitch och sparas i dess egen databas, inte i
-Proxmox nätverksfil. Blir något fel i labbet kan det därför aldrig hindra
+Proxmox nätverksfil. Blir något fel i labbet kan det därför inte hindra
 servern från att komma upp med sitt vanliga nätverk.
 
 **Maskinerna, som kod**
@@ -167,14 +165,16 @@ Plan: 4 to add, 0 to change, 0 to destroy.
 ```
 
 Fyra nya saker, alltså två maskiner och två cloud-init-filer, och ingenting
-befintligt ändrat eller borttaget. På en server där tio andra maskiner kör är
-det den raden som avgör om det är säkert att fortsätta.
+befintligt ändrat eller borttaget. På en server där ett femtontal andra
+maskiner och containrar kör är det den raden som avgör om det är säkert att
+fortsätta.
 
 **Drivrutinsskivan till Windows**
 
-Windows behöver drivrutiner från skivan `virtio-win` för att Proxmox ska kunna
-läsa av maskinen. Terraform tillåter bara en CD-enhet, så den andra hängdes på
-med Proxmox eget verktyg:
+Windows behöver drivrutiner från skivan `virtio-win` till gästagenten, som
+låter Proxmox läsa av maskinen, till exempel dess IP-adresser.
+Proxmox-providern för Terraform tillåter bara en CD-enhet, så den andra
+hängdes på med Proxmox eget verktyg:
 
 ```bash
 qm set 312 --ide3 local:iso/virtio-win.iso,media=cdrom
@@ -280,8 +280,21 @@ den 24 september 2026 11:41:06
 ```
 
 Jag tog bort mappen, rättade tidszonen och skapade mappen igen, så att
-tiderna i Linux och Windows går att jämföra. Datumet skrivs på svenska
-eftersom språkinställningen i Windows är svensk, trots engelska menyer.
+Windows visar svensk tid. Datumet skrivs på svenska eftersom
+språkinställningen i Windows är svensk, trots engelska menyer.
+
+Linuxservern går på UTC, som är standard i Ubuntus molnavbild och vanligt
+för servrar:
+
+```
+$ timedatectl | grep -E 'Time zone|synchronized'
+                Time zone: Etc/UTC (UTC, +0000)
+System clock synchronized: yes
+```
+
+Tiderna i Linuxutskrifterna ligger därför två timmar efter svensk tid. Båda
+klockorna går rätt, men den som jämför loggar från de två maskinerna måste
+veta vilken tidszon varje logg använder.
 
 ### 2.5 Verifiering
 
@@ -365,7 +378,7 @@ Jag hade skrivit ner de risker jag kände till innan arbetet började (avsnitt
 1.4). Linuxservern fick rätt adress på första försöket, vilket var just den del
 som krånglade mest förra gången. Tre saker blev ändå inte som planerat.
 
-**Terraform tillåter bara en CD-enhet.** Planen var att montera både
+**Terraform-providern tillåter bara en CD-enhet.** Planen var att montera både
 installationsskivan och drivrutinsskivan direkt i koden. `terraform validate`
 stoppade det innan något byggdes:
 
@@ -399,8 +412,8 @@ QEMU guest agent is not running
 
 Orsaken var att bara agentens eget paket hade installerats, inte
 drivrutinspaketet. Agenten pratar med Proxmox genom en virtuell serieport, och
-drivrutinen för den finns bara i `virtio-win-gt-x64.msi`. Utan den körde
-agenten men hade ingen kanal att prata genom.
+drivrutinen för den installeras av `virtio-win-gt-x64.msi`, inte av agentens
+eget paket. Utan den körde agenten men hade ingen kanal att prata genom.
 
 Det här stod som risk i planen, med rätt åtgärd. Den inträffade ändå, eftersom
 planen inte var framme när installationen gjordes. Lärdomen är att en
@@ -695,8 +708,8 @@ användare på servern. `RX` låter dem läsa. `AD` och `WD`, i PowerShell
 `KonsultData`. Linuxmappen i 3.1 stänger ute alla som inte är med i
 `konsulter`. Den här mappen är med standardrättigheterna öppen för alla som
 kan logga in på servern. Det bryter mot principen om lägsta behörighet från
-3.1. För känslig konsultdata skulle arvet behöva brytas
-och `BUILTIN\Users` bytas mot en grupp för konsulterna. Uppgiften bad bara om
+3.1. För känslig konsultdata skulle arvet behöva brytas och
+`BUILTIN\Users` bytas mot en grupp för konsulterna. Uppgiften bad bara om
 att visa rättigheterna, så det har jag inte gjort.
 
 **Nätverket**
@@ -779,29 +792,87 @@ mellan korten, så labbnätet får ingen väg ut genom servern.
 
 ### 4.1 Struktur
 
+Repot skapades med `git init` innan något annat gjordes, och planen i avsnitt 1
+var den första committen. Två inställningar gäller bara det här repot:
+
 ```
-<reponamn>/
-├── Labbdokumentation.md
-├── README.md
-├── bilder/
-└── diagram/
+$ git config --local --list | grep -E "template|encoding"
+commit.template=commit-mall.txt
+i18n.commitencoding=utf-8
+```
+
+`commit.template` gör att varje commit öppnas med en mall för meddelandet,
+så att alla följer samma form: en kort rubrik, en tom rad och sedan varför.
+`i18n.commitencoding` talar om för Git att meddelandena är skrivna i UTF-8,
+den teckenkodning som klarar å, ä och ö. Det är redan Gits standard, men
+inställningen gör det uttryckligt.
+
+```
+ISCX26-labb-v2/
+├── Labbdokumentation.md        rapporten
+├── README.md                   pekar hit
+├── bilder/                     skärmdumpar och diagrammets export
+├── diagram/
+│   └── labbmiljo-fysisk.drawio källfilen till diagrammet i 2.3
+├── terraform/
+│   ├── main.tf                 de två maskinerna
+│   ├── variables.tf            adressplanen och bryggorna
+│   ├── providers.tf            anslutningen till Proxmox
+│   ├── terraform.tfvars.exempel
+│   ├── .terraform.lock.hcl     låser providerns version
+│   └── cloud-init/             nät och användare för Linuxservern
+├── granska.sh                  kontrollskript, se 5.1
+├── commit-mall.txt
+├── .gitignore
+└── .gitattributes
 ```
 
 ### 4.2 Vad som inte ligger i repot
 
-> (mall) Vad `.gitignore` stoppar och varför. Bevis med `git check-ignore -v`.
+Terraform behöver en API-nyckel till Proxmox, och den får aldrig hamna i Git.
+Den ligger i `terraform.tfvars`, som stoppas av `.gitignore`. I repot finns i
+stället `terraform.tfvars.exempel`, som visar vilka värden som behövs men
+utan de riktiga. Samma sak gäller Terraforms tillståndsfil och sparade planer,
+som kan innehålla hemligheter i klartext.
+
+```
+$ git check-ignore -v terraform/terraform.tfvars terraform/terraform.tfstate terraform/.terraform terraform/tfplan
+.gitignore:32:terraform/terraform.tfvars	terraform/terraform.tfvars
+.gitignore:29:terraform/*.tfstate	terraform/terraform.tfstate
+.gitignore:28:terraform/.terraform/	terraform/.terraform
+.gitignore:33:terraform/tfplan	terraform/tfplan
+```
+
+Varje rad visar filen, vilken rad i `.gitignore` som stoppar den och vilket
+mönster som matchade. Alla fyra finns på min dator men inte i repot. Mappen
+`.terraform/` är providern som laddats ner. Den är stor och hämtas igen med
+`terraform init`, så den behöver inte sparas.
+
+Låsfilen `.terraform.lock.hcl` ligger däremot i repot med flit. Den låser vilken
+version av Proxmox-providern som användes, så att koden fungerar likadant
+nästa gång.
 
 ### 4.3 Repository
 
-> (mall) Länk. Privat eller publikt, och när det byts.
+<https://github.com/Labontese/ISCX26-labb-v2>
+
+Repot är privat under arbetet och görs publikt när uppgiften lämnas in.
 
 ### 4.4 Commit-historik
 
-> (mall) Regenereras ALLRA SIST, med noten att den är en commit kortare än repot.
+```
+$ git log --oneline
+90e66b5 Del 4: AI-logg, AI mot AI verifierat mot servern
+6c750d8 Del 3: rättigheter och nätverk i Windows
+43829f5 Del 3: rättigheter i Linux, testade skarpt
+9287579 Del 2: labbmiljön som kod, verifierad åt båda hållen
+2f3ac18 Initiera projektet och planera labbet
+```
 
-```
-$ git log --pretty=format:'%h  %ad  %s' --date=format:'%Y-%m-%d %H:%M'
-```
+Varje commit är en färdig del, granskad innan den gjordes.
+Listan togs fram precis före den sista committen, "Slutgranskning: faktakoll,
+Git-avsnitt och reflektion", som lägger till just det här avsnittet. Repot har
+därför en commit mer än listan.
 
 ---
 
@@ -815,6 +886,15 @@ Under resten av labben har jag nästan uteslutande använt Claude (Opus 5 och
 5.5). Jag har använt det för att kontrollera kommandon och frågeställningar,
 för att ifrågasätta mina egna funderingar, och för att ta reda på varför och
 hur saker fungerar i stället för att bara få ett kommando att köra.
+
+Med Claudes hjälp byggde jag också `granska.sh`, ett skript som jag kör före
+varje commit. Det viktigaste det gör är att leta efter nycklar, lösenord och
+API-token i kod- och konfigurationsfilerna, och att kontrollera att filen med
+Terraforms hemligheter är undantagen i `.gitignore`. Det fångar också vanliga
+stavfel och trasiga bildlänkar. Grönt betyder bara att skriptet inte hittade
+något, inte att innehållet är rätt. Skriptet tittar dessutom bara på filerna
+som de ser ut nu, så innan repot görs publikt sökte jag också igenom hela
+historiken efter hemligheter, utan träffar.
 
 **Metoden: AI mot AI.** Jag ställde en fråga till Gemini om något jag redan
 hade mätt i avsnitt 3.2, så att svaret gick att kontrollera. Sedan lät jag
@@ -951,8 +1031,11 @@ False
 
 AI mot AI var inte heller felfritt åt andra hållet. Innan jag körde `Get-Acl`
 i 3.2 förutsade Claude att en rad med ett långt SID från `C:\` skulle ärvas
-ner till den nya mappen. Det gjorde den inte, och `icacls` visade varför. Det
-stärkte regeln att inget AI-svar räknas förrän det är provat.
+ner till den nya mappen. Det gjorde den inte, och `icacls` visade varför.
+Claudes granskning i prompt 2 hade också ett fel: där står att punkt 6 inte
+gick att bevisa, men mappen i 3.2 hade redan fått en egen rad för ägaren.
+Det hittades när hela dokumentet faktakollades mot servern före inlämning.
+Båda sakerna stärkte regeln att inget AI-svar räknas förrän det är provat.
 
 ### 5.4 Vad mätningarna visade
 
@@ -962,12 +1045,13 @@ stärkte regeln att inget AI-svar räknas förrän det är provat.
 | 268435456 är "det decimala värdet för Full Control" | svar 1 | Fel. Full Control är 2032127, `0x1F01FF`. Svaret säger emot sig självt |
 | Rättigheten påverkar inte själva mappen där den sätts | svar 1 | Stämmer, `(IO)` på `C:\` |
 | Användaren som skapar blir ägare | svar 1 | Ofullständigt. Ägaren blev gruppen `BUILTIN\Administrators` |
-| Skaparen får rättigheterna direkt | svar 1 | Gick inte att visa. Administrators har redan full kontroll genom arvet |
-| CREATOR OWNER är ett konto | svar 1 | Fel. Det är en platshållare, ett well-known SID |
+| Skaparen får rättigheterna direkt | svar 1 | Delvis. Mappen i 3.2 fick en egen rad för ägaren, raden med `False`. Filen fick ingen egen rad, men där har Administrators redan full kontroll genom arvet |
+| CREATOR OWNER är ett konto | svar 1 | Missvisande. Det är inget konto utan ett well-known SID, en platshållare. Svaret kallar det själv en platshållare längre ner |
 | Raden CREATOR OWNER stod som `False` | svar 2 | Fel. CREATOR OWNER stod som `True`, raden med `False` var Administrators |
 | En standardanvändare blir själv ägare | svar 2 | Inte testat |
 
-Svar 1 nämnde ingen säkerhetsrisk alls. Svar 2 tog upp risker först när
+Svar 1 beskrev att alla som skapar filer får full kontroll över dem, men
+pekade inte ut det som en säkerhetsrisk. Svar 2 tog upp riskerna först när
 prompten pekade ut att de saknades.
 
 ### 5.5 Min bedömning
@@ -997,8 +1081,42 @@ verkliga utskrifter i systemet.
 
 ### 6.1 Vad jag inte testade
 
-> (mall) Ärligt. Det som lämnades oprövat och varför.
+Allt i Windows kördes som Administrator. Att ett vanligt konto får egna
+rättigheter via CREATOR OWNER, och att `BUILTIN\Users` kan skapa filer i
+`KonsultData`, har jag läst av i rättigheterna men aldrig provat med ett
+vanligt konto.
+
+Windows-mappen låste jag inte heller, eftersom uppgiften bara bad om att visa
+rättigheterna. Hade det varit en riktig kunds server hade jag föreslagit
+ändringen för kunden och motiverat den med att skyddet annars inte är
+fullgott.
+
+Tre saker till är inte provade:
+
+- Linux har inte startats om, trots 44 väntande uppdateringar och
+  `System restart required` i välkomsttexten, som syns i första bilden i 3.1.
+- Windows har inte kallstartats efter tidszonsbytet. Med fel tidszon gick
+  klockan 9 timmar fel vid varje kallstart, tills tidssynken rättade den.
+  Det syns i händelseloggen (Kernel-General, händelse 1). Felet borde vara
+  borta nu, men det är inte provat.
+- Isoleringen är visad genom att bryggan saknar fysisk port, inte genom ett
+  försök att skicka trafik ut från labbnätet.
 
 ### 6.2 Vad jag tar med mig
 
-> (mall) Tre punkter räcker. Konkreta, inte "jag lärde mig mycket".
+**En listning är inte ett bevis.** Jag trodde att `nobody` inte skulle få
+åtkomst, eftersom kontot varken äger mappen eller är med i gruppen
+`konsulter` och därför räknas som övriga. Men det räckte inte att tro det
+eller läsa av det i listningen. Testet visade att det faktiskt stämde.
+
+**AI låter säker även när den har fel.** Att Gemini svarade fel förvånade mig
+inte. Jag är van vid att AI ibland svarar fel med stor säkerhet eller går
+runt i cirklar. Därför kontrollerar jag alltid det den säger.
+
+**Automatisering gör bara det man har sagt åt den.** Tidszonen förvånade mig
+inte. Terraform skapade Windowsmaskinen med installationsskivan, och själva
+installationen gjorde jag för hand från ISO. Jag vet att allt då är
+okonfigurerat. Tidszonen ställdes aldrig in, eftersom jag räknade med att
+Terraform skulle sköta den, så den missades. Men Terraform bygger bara
+maskinen, inte det som ställs in inne i Windows. Lärdomen är att kontrollera
+vad automatiseringen faktiskt har ställt in.
