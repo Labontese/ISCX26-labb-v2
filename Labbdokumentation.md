@@ -807,18 +807,189 @@ $ git log --pretty=format:'%h  %ad  %s' --date=format:'%Y-%m-%d %H:%M'
 
 ## 5. AI-stöd och granskning
 
-> (mall) Bara om uppgiften kräver det. Prompt ordagrant, svar ordagrant, verifiering
-> (mall) på en kopia, mätningar, och sist min egen bedömning i egen text.
-
 ### 5.1 Verktyg och prompt
 
-### 5.2 Svaret, ordagrant
+**Verktyg:** Google Gemini i webbläsaren för AI-loggen, 24 september 2026.
+
+Under resten av labben har jag nästan uteslutande använt Claude (Opus 5 och
+5.5). Jag har använt det för att kontrollera kommandon och frågeställningar,
+för att ifrågasätta mina egna funderingar, och för att ta reda på varför och
+hur saker fungerar i stället för att bara få ett kommando att köra.
+
+**Metoden: AI mot AI.** Jag ställde en fråga till Gemini om något jag redan
+hade mätt i avsnitt 3.2, så att svaret gick att kontrollera. Sedan lät jag
+Claude granska svaret mot mina mätningar och gav granskningen till Gemini
+som en uppföljning. Till sist kontrollerade jag båda AI-verktygen mot riktiga
+utskrifter från servern. Ingen av dem fick sista ordet.
+
+**Prompt 1**, skriven av mig:
+
+> Vad betyder CREATOR OWNER och siffran 268435456 i Get-Acl?
+
+**Prompt 2** var Claudes genomgång av svar 1, inklistrad ordagrant:
+
+![Prompt 2 inklistrad i Gemini](bilder/del4-prompt2.png)
+
+> Punkt 1: talet är GENERIC_ALL ✓
+> Gemini sa att 268435456 skrivet på ett annat sätt (hexadecimalt) blir 0x10000000. Din första rad i testet räknade om det och fick samma sak. Gemini hade rätt.
+>
+> Punkt 3: C:\ själv påverkas inte ✓
+> I icacls C:\ står CREATOR OWNER:(OI)(CI)(IO)(F). (IO) betyder inherit only, alltså att raden bara förs vidare nedåt och inte gäller C:\ själv. Gemini hade rätt.
+>
+> Punkt 4: vem som blir ägare, halvrätt
+> Gemini sa att användaren som skapar något blir ägare. Du skapade både mappen och filen som användaren Administrator. Men i båda utskrifterna står ägaren som:
+>
+> BUILTIN\Administrators
+> Det är gruppen Administrators, inte du som användare. Windows gör så för konton som är administratörer. Gemini missade det undantaget.
+>
+> Punkt 6: "får rättigheterna direkt", gick inte att bevisa
+> Gemini sa att den som skapar något får full kontroll över det. Titta på filen:
+>
+> NT AUTHORITY\SYSTEM:(I)(F)
+> BUILTIN\Administrators:(I)(F)
+> BUILTIN\Users:(I)(RX)
+> Alla tre raderna har (I), så de är ärvda. Det finns ingen egen rad för ägaren.
+> Problemet är att Administrators redan hade full kontroll genom arvet. Om CREATOR OWNER hade gett något extra hade det inte synts, eftersom det redan fanns. Det är som att testa om en nyckel fungerar på en dörr som redan står öppen.
+> För att testa det på riktigt skulle en vanlig användare utan adminrätt skapa en fil. Det har vi inte gjort, så vi skriver ärligt att det inte är testat, i stället för att påstå något.
+>
+> Punkt 5: det var den som saknades i tabellen
+> Gemini kallar CREATOR OWNER ett "säkerhetskonto". Men ingen kan logga in som CREATOR OWNER. Det är en platshållare, som ett tomt fält i en blankett där Windows fyller i den riktiga ägaren när något skapas. Det är ett litet fel i ordvalet.
+>
+> Tre saker Gemini inte sa något om
+> Vår egentliga fråga: varför en rad stod med False. Svaret förklarar det inte.
+> Punkt 5 ovan: att det inte är ett konto.
+> Säkerheten. Alla användare får skapa filer i mappen (CreateFiles), och den som skapar en fil blir ägare. Då kan vem som helst lägga in filer och bestämma över dem. Uppgiften frågar särskilt efter säkerhetsbrister, och Gemini tar inte upp någon.
+
+### 5.2 Svaren, ordagrant
+
+**Svar 1**
+
+![Geminis svar på prompt 1](bilder/del4-gemini.png)
+
+> CREATOR OWNER är ett inbyggt säkerhetskonto i Windows som fungerar som en dynamisk mall för behörigheter, och siffran 268435456 är det decimala värdet för "Full Control" (Fullständig behörighet).
+>
+> Här är en närmare titt på vad de båda delarna innebär i utdata från Get-Acl:
+>
+> CREATOR OWNER
+> Detta konto fungerar som en platshållare i katalogstrukturen. Om du tilldelar rättigheter till CREATOR OWNER på en mapp och ställer in att behörigheten ska ärvas, händer ingenting med själva huvudmappen. När en användare därefter skapar en ny fil eller undermapp inuti denna katalog, träder mallen i kraft. Användaren som skapade objektet blir "Owner" och tilldelas omedelbart de rättigheter som definierades för CREATOR OWNER.
+>
+> Siffran 268435456
+> Detta nummer representerar en så kallad AccessMask, vilket är ett värde som Windows använder under ytan för att förstå exakt vilka rättigheter som ska gälla.
+>
+> Värdet 268435456 omvandlat till hexadecimalt format blir 0x10000000.
+>
+> I Windows säkerhetsarkitektur motsvarar detta specifika hex-värde flaggan GENERIC_ALL.
+>
+> GENERIC_ALL betyder att användaren får totala rättigheter att läsa, skriva, ändra, ta bort och hantera behörigheter för objektet.
+>
+> När du ser dessa två kombinerade i utdata från Get-Acl betyder det rent praktiskt att alla användare som skapar nya filer eller mappar i katalogen per automatik får fullständig kontroll över just de specifika objekt de själva har skapat.
+
+**Svar 2**
+
+![Geminis svar på prompt 2](bilder/del4-gemini-2.png)
+
+> Snygg felsökning och en väldigt träffsäker analys. Din liknelse med att testa en nyckel på en dörr som redan står öppen är en perfekt beskrivning av hur behörighetsarv i Windows fungerar när man testar med administratörsrättigheter.
+>
+> Här är en djupdykning i de tre delarna som saknades och korrigeringarna du gjorde:
+>
+> Administratörsundantaget
+> Du ringade in en helt korrekt detalj. I Windows finns en inbyggd säkerhetspolicy som dikterar att när en medlem av den lokala administratörsgruppen skapar en fil eller mapp, blir hela gruppen (BUILTIN\Administrators) ägare till objektet. Det är ett undantag. Om en vanlig standardanvändare hade skapat filen hade dennes specifika användarnamn tilldelats ägandeskapet.
+>
+> Ordvalet Konto
+> Du har helt rätt. CREATOR OWNER är inget konto man kan logga in på. Den tekniska termen är "Well-known SID" (Security Identifier). Det är en abstrakt mekanism i operativsystemet som enbart existerar för att instruera NTFS-filsystemet hur det ska hantera rättigheter vid skapandet av nya objekt.
+>
+> Varför IsInherited är False
+> I utdata från PowerShell visar egenskapen IsInherited om behörigheten kommer från en överliggande mapp (True) eller om den är applicerad direkt på det aktuella objektet (False). Att raden med CREATOR OWNER är markerad som False betyder att mallen applicerades explicit på just den katalogen du granskar. Den agerar startpunkt för arvet nedåt i strukturen och har inte trillat ner från C:\ eller en annan förälder.
+>
+> Säkerhetsbristerna
+> Kombinationen av att låta alla användare skapa filer och samtidigt ge CREATOR OWNER fullständig kontroll skapar allvarliga säkerhetsproblem i en delad miljö:
+>
+> Exkludering av administratörer: Användaren som skapar filen får rätt att ändra dess behörigheter (ChangePermissions). Användaren kan därmed ta bort administratörernas eller systemets åtkomst till filen. Även om en administratör alltid kan tvinga till sig ägandeskapet i efterhand skapar det stora problem för automatiserade processer, fillåsningar och backuprutiner.
+>
+> Dolda filer och skadlig kod: En användare eller ett program kan spara en fil, sätta exklusiva rättigheter på den och dölja den från andra standardanvändare i systemet.
+>
+> Brott mot best practice: Konfigurationen bryter mot principen om minsta möjliga behörighet (Principle of Least Privilege). Användare bör normalt enbart ha Modify, vilket innebär läsa, skriva, ändra och ta bort, på filer de skapar. De ska normalt aldrig ha Full Control på en delad yta.
+>
+> Vill du att vi sätter upp ett testscenario i PowerShell där vi skapar en standardanvändare och bevisar i praktiken hur behörigheterna landar när vi inte har administratörsundantaget i vägen?
 
 ### 5.3 Så verifierade jag
 
+Det mesta kunde jag kontrollera mot utskrifter jag redan hade i avsnitt 3.2:
+`Owner` från `Get-Acl`, kolumnen `IsInherited` och flaggorna från `icacls`.
+Två saker krävde ett nytt test: vilket tal Windows själv använder för Full
+Control, och vad som händer när en fil skapas. Filen skapade jag i en
+testmapp, så att `KonsultData` inte ändrades.
+
+```
+> '0x{0:X}' -f 268435456
+0x10000000
+> [int][System.Security.AccessControl.FileSystemRights]::FullControl
+2032127
+> '0x{0:X}' -f [int][System.Security.AccessControl.FileSystemRights]::FullControl
+0x1F01FF
+> New-Item -ItemType Directory C:\Systementor\AiTest | Out-Null
+> New-Item C:\Systementor\AiTest\prov.txt | Out-Null
+> icacls C:\Systementor\AiTest\prov.txt
+C:\Systementor\AiTest\prov.txt NT AUTHORITY\SYSTEM:(I)(F)
+                               BUILTIN\Administrators:(I)(F)
+                               BUILTIN\Users:(I)(RX)
+
+Successfully processed 1 files; Failed processing 0 files
+> (Get-Acl C:\Systementor\AiTest\prov.txt).Owner
+BUILTIN\Administrators
+```
+
+![Test av Geminis påståenden](bilder/del4-test.png)
+
+Efteråt tog jag bort testmappen:
+
+```
+> Remove-Item C:\Systementor\AiTest -Recurse
+> Test-Path C:\Systementor\AiTest
+False
+```
+
+AI mot AI var inte heller felfritt åt andra hållet. Innan jag körde `Get-Acl`
+i 3.2 förutsade Claude att en rad med ett långt SID från `C:\` skulle ärvas
+ner till den nya mappen. Det gjorde den inte, och `icacls` visade varför. Det
+stärkte regeln att inget AI-svar räknas förrän det är provat.
+
 ### 5.4 Vad mätningarna visade
 
+| Påstående | Källa | Mätningen |
+|---|---|---|
+| 268435456 är `0x10000000`, GENERIC_ALL | svar 1 | Stämmer |
+| 268435456 är "det decimala värdet för Full Control" | svar 1 | Fel. Full Control är 2032127, `0x1F01FF`. Svaret säger emot sig självt |
+| Rättigheten påverkar inte själva mappen där den sätts | svar 1 | Stämmer, `(IO)` på `C:\` |
+| Användaren som skapar blir ägare | svar 1 | Ofullständigt. Ägaren blev gruppen `BUILTIN\Administrators` |
+| Skaparen får rättigheterna direkt | svar 1 | Gick inte att visa. Administrators har redan full kontroll genom arvet |
+| CREATOR OWNER är ett konto | svar 1 | Fel. Det är en platshållare, ett well-known SID |
+| Raden CREATOR OWNER stod som `False` | svar 2 | Fel. CREATOR OWNER stod som `True`, raden med `False` var Administrators |
+| En standardanvändare blir själv ägare | svar 2 | Inte testat |
+
+Svar 1 nämnde ingen säkerhetsrisk alls. Svar 2 tog upp risker först när
+prompten pekade ut att de saknades.
+
 ### 5.5 Min bedömning
+
+Geminis svar lät övertygande och var delvis korrekta, men praktiska tester
+visade att informationen inte var helt tillförlitlig i detaljerna.
+
+**Detta stämde:** Värdet 268435456 motsvarar GENERIC_ALL, och regeln påverkar
+inte själva roten `C:\`.
+
+**Detta var fel:** Värdet är inte "Full Control", som egentligen är 2032127.
+Dessutom tillfaller ägandeskapet gruppen Administrators och inte den enskilda
+användaren, när det är en administratör som skapar mappen. I det andra svaret
+var också statusen för IsInherited omkastad: där stod att CREATOR OWNER var
+`False`, men min skärmdump visar att det var Administrators.
+
+**Detta saknades:** Säkerhetsrisken utelämnades helt i det första svaret, och
+definitionen av CREATOR OWNER var felaktig, eftersom det är en platshållare
+och inte ett säkerhetskonto.
+
+Den stora lärdomen är att tvärsäkra AI-svar alltid måste verifieras mot
+verkliga utskrifter i systemet.
 
 ---
 
