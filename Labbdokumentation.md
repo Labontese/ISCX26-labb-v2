@@ -258,6 +258,31 @@ gången jag anslöt sparades maskinernas fingeravtryck. Jag jämförde dem med
 fingeravtrycken avlästa inifrån maskinerna, och de stämde. Då vet jag att det
 är rätt maskin som svarar.
 
+**Tidszonen i Windows**
+
+När mappen i avsnitt 3.2 skapades första gången fick den tiden 02:36, fast
+klockan var 11:36. Windows hade kvar tidszonen från installationen:
+
+```
+> Get-TimeZone
+
+Id                         : Pacific Standard Time
+DisplayName                : (UTC-08:00) Pacific Time (US & Canada)
+StandardName               : Pacific Standard Time
+DaylightName               : Pacific Daylight Time
+BaseUtcOffset              : -08:00:00
+SupportsDaylightSavingTime : True
+
+> Set-TimeZone -Id "W. Europe Standard Time"
+> Get-Date
+
+den 24 september 2026 11:41:06
+```
+
+Jag tog bort mappen, rättade tidszonen och skapade mappen igen, så att
+tiderna i Linux och Windows går att jämföra. Datumet skrivs på svenska
+eftersom språkinställningen i Windows är svensk, trots engelska menyer.
+
 ### 2.5 Verifiering
 
 **Linuxservern, avläst inifrån maskinen**
@@ -486,6 +511,12 @@ drwxr-x--- root konsulter konsultdata
 
 `drwxr-x---` är 750 och `-rw-r-----` är 640, precis som uppgiften kräver.
 
+Det här är principen om lägsta behörighet, *least privilege*: varje
+användare får precis det den behöver för sitt arbete och inget mer. Root
+förvaltar filen. Konsulterna behöver läsa anteckningarna men inte ändra dem.
+Alla andra behöver ingenting, och får därför ingenting. Blir ett konto
+kapat kommer angriparen bara åt det kontot redan hade rätt till.
+
 **Skarpt test**
 
 Listan visar vad som borde gälla. För att se att det faktiskt gäller skrev jag
@@ -573,8 +604,174 @@ tills någon ändrar den. `ens19` har `dynamic` och `valid_lft 5614sec`, adresse
 
 ### 3.2 Windows
 
-> (mall) Mapp, `Get-Acl`, ping eller `Test-Connection`, `ipconfig /all`. Samma
-> (mall) form som 3.1.
+Här är jag inloggad som `Administrator` med SSH, och skalet är PowerShell.
+
+**Mappen och dess rättigheter**
+
+```
+> New-Item -ItemType Directory -Path C:\Systementor\KonsultData
+
+    Directory: C:\Systementor
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----        2026-09-24     11:41                KonsultData
+
+> Get-Acl C:\Systementor\KonsultData
+
+    Directory: C:\Systementor
+
+Path        Owner                  Access
+----        -----                  ------
+KonsultData BUILTIN\Administrators BUILTIN\Administrators Allow  FullControl...
+
+> (Get-Acl C:\Systementor\KonsultData).Access | Format-Table IdentityReference,FileSystemRights,AccessControlType,IsInherited -AutoSize
+
+IdentityReference                 FileSystemRights AccessControlType IsInherited
+-----------------                 ---------------- ----------------- -----------
+BUILTIN\Administrators                 FullControl             Allow       False
+NT AUTHORITY\SYSTEM                    FullControl             Allow        True
+BUILTIN\Administrators                 FullControl             Allow        True
+BUILTIN\Users          ReadAndExecute, Synchronize             Allow        True
+BUILTIN\Users                           AppendData             Allow        True
+BUILTIN\Users                          CreateFiles             Allow        True
+CREATOR OWNER                            268435456             Allow        True
+```
+
+![Mappen skapad och Get-Acl](bilder/del3-win-1-acl.png)
+
+`New-Item` skapar båda nivåerna på en gång, som `mkdir -p` i Linux. `Get-Acl`
+visar ägaren och en förkortad lista, så jag skrev ut listan i sin helhet på
+sista raden. `IsInherited` talar om ifall rättigheten är ärvd från `C:\` eller
+satt direkt på mappen.
+
+För att förstå varför en rad inte var ärvd läste jag också ut rättigheterna
+med `icacls`, som visar hur de förs vidare:
+
+```
+> icacls C:\
+C:\ S-1-15-3-65536-1888954469-739942743-1668119174-2468466756-4239452838-1296943325-355587736-700089176:(S,RD,X,RA)
+    NT AUTHORITY\SYSTEM:(OI)(CI)(F)
+    BUILTIN\Administrators:(OI)(CI)(F)
+    BUILTIN\Users:(OI)(CI)(RX)
+    BUILTIN\Users:(CI)(AD)
+    BUILTIN\Users:(CI)(IO)(WD)
+    CREATOR OWNER:(OI)(CI)(IO)(F)
+
+Successfully processed 1 files; Failed processing 0 files
+
+> icacls C:\Systementor\KonsultData
+C:\Systementor\KonsultData BUILTIN\Administrators:(F)
+                           NT AUTHORITY\SYSTEM:(I)(OI)(CI)(F)
+                           BUILTIN\Administrators:(I)(OI)(CI)(F)
+                           BUILTIN\Users:(I)(OI)(CI)(RX)
+                           BUILTIN\Users:(I)(CI)(AD)
+                           BUILTIN\Users:(I)(CI)(WD)
+                           CREATOR OWNER:(I)(OI)(CI)(IO)(F)
+
+Successfully processed 1 files; Failed processing 0 files
+```
+
+![icacls på C:\ och på mappen](bilder/del3-win-1-icacls.png)
+
+`(I)` betyder ärvd. `(OI)` och `(CI)` betyder att rättigheten förs vidare till
+filer respektive undermappar. `(IO)` betyder att den bara förs vidare och inte
+gäller själva mappen.
+
+- **Raden med `False`.** `CREATOR OWNER:(F)` på `C:\` betyder att den som
+  skapar en mapp får full kontroll över den. När mappen skapas byts
+  "CREATOR OWNER" ut mot den verkliga ägaren, som här är
+  `BUILTIN\Administrators`. Den nya raden sätts direkt på mappen och räknas
+  därför inte som ärvd.
+- **Siffran `268435456`.** Det är `0x10000000`, som betyder GENERIC_ALL,
+  alltså allt. PowerShell har inget namn för den formen av rättighet och
+  skriver siffran i stället.
+- **Raden med ett långt SID på `C:\`** saknar `(OI)(CI)`. Den gäller bara
+  `C:\` och kommer inte med i den nya mappen.
+
+Det viktigaste står på raderna för `BUILTIN\Users`, alltså alla vanliga
+användare på servern. `RX` låter dem läsa. `AD` och `WD`, i PowerShell
+`AppendData` och `CreateFiles`, låter dem skapa undermappar och filer i
+`KonsultData`. Linuxmappen i 3.1 stänger ute alla som inte är med i
+`konsulter`. Den här mappen är med standardrättigheterna öppen för alla som
+kan logga in på servern. Det bryter mot principen om lägsta behörighet från
+3.1. För känslig konsultdata skulle arvet behöva brytas
+och `BUILTIN\Users` bytas mot en grupp för konsulterna. Uppgiften bad bara om
+att visa rättigheterna, så det har jag inte gjort.
+
+**Nätverket**
+
+```
+> Test-Connection 192.168.110.50 -Count 4
+
+Source        Destination     IPV4Address      IPV6Address                              Bytes    Time(ms)
+------        -----------     -----------      -----------                              -----    --------
+ISCX26-WIN    192.168.110.50                                                            32       10
+ISCX26-WIN    192.168.110.50                                                            32       1
+ISCX26-WIN    192.168.110.50                                                            32       0
+ISCX26-WIN    192.168.110.50                                                            32       0
+```
+
+![Test-Connection till Linux](bilder/del3-win-2-ping.png)
+
+Fyra svar från Linuxservern. `Test-Connection` är PowerShells version av
+`ping`. Till skillnad från `ping` i avsnitt 2.5 visar den inte TTL.
+
+```
+> ipconfig /all
+
+Windows IP Configuration
+
+   Host Name . . . . . . . . . . . . : iscx26-win
+   Primary Dns Suffix  . . . . . . . :
+   Node Type . . . . . . . . . . . . : Hybrid
+   IP Routing Enabled. . . . . . . . : No
+   WINS Proxy Enabled. . . . . . . . : No
+   DNS Suffix Search List. . . . . . : lan
+
+Ethernet adapter Labb:
+
+   Connection-specific DNS Suffix  . :
+   Description . . . . . . . . . . . : Intel(R) 82574L Gigabit Network Connection
+   Physical Address. . . . . . . . . : BC-24-11-00-C3-12
+   DHCP Enabled. . . . . . . . . . . : No
+   Autoconfiguration Enabled . . . . : Yes
+   Link-local IPv6 Address . . . . . : fe80::bc6c:5eaf:f1aa:4004%7(Preferred)
+   IPv4 Address. . . . . . . . . . . : 192.168.110.51(Preferred)
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . :
+   DHCPv6 IAID . . . . . . . . . . . : 96216081
+   DHCPv6 Client DUID. . . . . . . . : 00-01-01-00-32-46-5E-AC-BC-24-11-00-C3-12
+   NetBIOS over Tcpip. . . . . . . . : Enabled
+
+Ethernet adapter Drift:
+
+   Connection-specific DNS Suffix  . : lan
+   Description . . . . . . . . . . . : Intel(R) 82574L Gigabit Network Connection #2
+   Physical Address. . . . . . . . . : BC-24-11-00-D3-12
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+   Link-local IPv6 Address . . . . . : fe80::6f09:54c0:52a9:c32e%6(Preferred)
+   IPv4 Address. . . . . . . . . . . : 10.10.70.113(Preferred)
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Lease Obtained. . . . . . . . . . : den 24 september 2026 07:21:23
+   Lease Expires . . . . . . . . . . : den 24 september 2026 13:21:24
+   Default Gateway . . . . . . . . . : 10.10.70.1
+   DHCP Server . . . . . . . . . . . : 10.10.70.1
+   DHCPv6 IAID . . . . . . . . . . . : 180102161
+   DHCPv6 Client DUID. . . . . . . . : 00-01-01-00-32-46-5E-AC-BC-24-11-00-C3-12
+   DNS Servers . . . . . . . . . . . : 10.10.0.4
+   NetBIOS over Tcpip. . . . . . . . : Enabled
+```
+
+![ipconfig /all](bilder/del3-win-3-ipconfig.png)
+
+Kortet `Labb` har `DHCP Enabled: No` och adressen `192.168.110.51` med masken
+`255.255.255.0`. Adressen är alltså statisk, och `Default Gateway` är tom,
+precis som i tabellen i 2.1. MAC-adressen `BC-24-11-00-C3-12` är den jag satte
+i Terraform. Kortet `Drift` har fått sin adress, gateway och DNS-server från
+DHCP. `IP Routing Enabled: No` betyder att Windows inte skickar trafik vidare
+mellan korten, så labbnätet får ingen väg ut genom servern.
 
 ---
 
