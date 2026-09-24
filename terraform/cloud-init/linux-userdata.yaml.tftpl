@@ -1,0 +1,18 @@
+#cloud-config
+hostname: iscx26-linux
+manage_etc_hosts: true
+
+users:
+  - name: daniel
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    groups: [sudo, adm]
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+package_update: true
+packages:
+  - qemu-guest-agent
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent

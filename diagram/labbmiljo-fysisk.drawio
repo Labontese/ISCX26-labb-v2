@@ -1,0 +1,94 @@
+<mxfile host="draw.serverdigital.net">
+  <diagram id="iscx26-labb-v2" name="Fysisk placering">
+    <mxGraphModel dx="1597" dy="738" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="826" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="titel" parent="1" style="text;html=1;fontSize=24;fontStyle=1;fontColor=#1E1E1E;align=left;verticalAlign=middle;" value="ISCX26 labbmiljö: fysisk placering" vertex="1">
+          <mxGeometry height="36" width="600" x="40" y="24" as="geometry" />
+        </mxCell>
+        <mxCell id="undertitel" parent="1" style="text;html=1;fontSize=13;fontColor=#5C5F66;align=left;verticalAlign=middle;" value="Daniel Gustafsson, Chas Academy" vertex="1">
+          <mxGeometry height="20" width="600" x="40" y="58" as="geometry" />
+        </mxCell>
+
+        <mxCell id="host" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8F9FA;strokeColor=#ADB5BD;verticalAlign=top;fontSize=14;fontStyle=1;fontColor=#495057;align=left;spacingLeft=16;spacingTop=10;arcSize=4;" value="Proxmox-servern &quot;pve&quot;, en fysisk maskin" vertex="1">
+          <mxGeometry height="582" width="640" x="40" y="78" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vm311" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#495057;fontSize=13;arcSize=8;" value="&lt;b&gt;iscx26-linux&lt;/b&gt;&lt;br&gt;VM 311&lt;br&gt;&lt;font color=&quot;#5C5F66&quot;&gt;Ubuntu Server 26.04&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="270" x="75" y="155" as="geometry" />
+        </mxCell>
+        <mxCell id="vm312" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#495057;fontSize=13;arcSize=8;" value="&lt;b&gt;iscx26-win&lt;/b&gt;&lt;br&gt;VM 312&lt;br&gt;&lt;font color=&quot;#5C5F66&quot;&gt;Windows Server 2025&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="270" x="375" y="155" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ovsbr" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F4EA;strokeColor=#2F9E44;strokeWidth=2;fontSize=13;" value="&lt;b&gt;ovsbr-iscx26b&lt;/b&gt;&lt;br&gt;virtuell switch&lt;br&gt;&lt;font color=&quot;#2F6B0E&quot;&gt;192.168.110.0/24&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="270" x="75" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="vmbr1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7F0FF;strokeColor=#1971C2;strokeWidth=2;fontSize=13;" value="&lt;b&gt;vmbr1&lt;/b&gt;&lt;br&gt;virtuell switch&lt;br&gt;&lt;font color=&quot;#1864AB&quot;&gt;VLAN 70, 10.10.70.0/24&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="270" x="375" y="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="stopp" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF5F5;strokeColor=#E03131;dashed=1;fontSize=12;arcSize=12;" value="&lt;b&gt;Ingen fysisk port&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#5C5F66&quot;&gt;trafiken kan inte lämna servern&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="270" x="75" y="545" as="geometry" />
+        </mxCell>
+        <mxCell id="nic" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1971C2;fontSize=12;arcSize=12;" value="&lt;b&gt;eno1np0&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#5C5F66&quot;&gt;fysiskt nätverkskort&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="180" x="420" y="545" as="geometry" />
+        </mxCell>
+
+        <mxCell id="switch" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#495057;fontSize=12;arcSize=12;" value="&lt;b&gt;Fysisk switch&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#5C5F66&quot;&gt;Juniper&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="170" x="730" y="546" as="geometry" />
+        </mxCell>
+        <mxCell id="pfsense" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#495057;fontSize=12;arcSize=12;" value="&lt;b&gt;pfSense&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#5C5F66&quot;&gt;router och brandvägg&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="170" x="730" y="438" as="geometry" />
+        </mxCell>
+        <mxCell id="internet" parent="1" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#F1F3F5;strokeColor=#868E96;fontSize=12;" value="Internet" vertex="1">
+          <mxGeometry height="90" width="170" x="730" y="310" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" edge="1" parent="1" source="vm311" target="ovsbr" value="net0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2F9E44;strokeWidth=2;fontSize=11;fontColor=#2F6B0E;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.35;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="vm312" target="ovsbr" value="net0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2F9E44;strokeWidth=2;fontSize=11;fontColor=#2F6B0E;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="443" y="320" />
+              <mxPoint x="291" y="320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="vm311" target="vmbr1" value="net1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1971C2;strokeWidth=2;dashed=1;fontSize=11;fontColor=#1864AB;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="277" y="345" />
+              <mxPoint x="429" y="345" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="vm312" target="vmbr1" value="net1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1971C2;strokeWidth=2;dashed=1;fontSize=11;fontColor=#1864AB;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.7;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="vmbr1" target="nic" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1971C2;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="nic" target="switch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1971C2;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="switch" target="pfsense" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#868E96;strokeWidth=2;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="pfsense" target="internet" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#868E96;strokeWidth=2;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="ovsbr" target="stopp" style="edgeStyle=none;rounded=0;html=1;strokeColor=#E03131;strokeWidth=2;dashed=1;endArrow=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="forklaring" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#DEE2E6;align=left;verticalAlign=top;spacing=12;fontSize=12;fontColor=#495057;arcSize=6;" value="&lt;b&gt;Att läsa diagrammet&lt;/b&gt;&lt;br&gt;&lt;br&gt;Grön linje: labbnätet, det uppgiften handlar om.&lt;br&gt;Blå streckad: driftnätet, för administration.&lt;br&gt;&lt;br&gt;Poängen är att &lt;b&gt;ovsbr-iscx26b saknar linje&lt;/b&gt; ner till nätverkskortet. Det är hela isoleringen. vmbr1 har en sådan linje, och därför når driftkorten ut på hemnätet." vertex="1">
+          <mxGeometry height="222" width="210" x="710" y="78" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

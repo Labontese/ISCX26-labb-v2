@@ -1,0 +1,14 @@
+version: 2
+ethernets:
+  # Korten pekas ut med namn, inte med MAC-adress. cloud-init kontrollerar
+  # MAC-adresser så tidigt i uppstarten att de virtuella korten inte hunnit
+  # dyka upp, och då skrivs ingen nätverkskonfiguration alls.
+  #
+  # net0, labbnätet. Ingen gateway: nätet har ingenstans att routa vidare.
+  ens18:
+    addresses:
+      - ${ip_linux}
+
+  # net1, driftnätet. Standardrutten tas härifrån.
+  ens19:
+    dhcp4: true

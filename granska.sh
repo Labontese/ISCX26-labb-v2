@@ -124,7 +124,7 @@ fi
 
 # ------------------------------------------------------------- hemligheter
 rubrik "Hemligheter i det som skulle committas"
-H=$(git grep -nE 'AAAA[A-Za-z0-9+/]{40,}|ghp_[A-Za-z0-9]{20,}|PVEAPIToken=|password\s*=\s*"[^"]{4,}' -- ':!*.md' 2>/dev/null || true)
+H=$(git grep -nE 'AAAA[A-Za-z0-9+/]{40,}|ghp_[A-Za-z0-9]{20,}|PVEAPIToken=|password\s*=\s*"[^"]{4,}' -- ':!*.md' ':!granska.sh' 2>/dev/null || true)
 if [ -n "$H" ]; then
     fel "ser ut som hemlighet eller nyckel i spårad fil:"
     echo "$H" | cut -c1-100 | head -5 | sed 's/^/          /'
